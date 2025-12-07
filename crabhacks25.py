@@ -42,7 +42,7 @@ START_BG_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Water")
 
 
 #shell
-SHELL_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/shell.png")
+SHELL_PATH = os.path.join(BASE_PATH, "shell.png")
 shell_img = pygame.image.load(SHELL_PATH).convert_alpha()
 shell_img = pygame.transform.scale(shell_img, (50, 50))
 shell_rect = shell_img.get_rect()
