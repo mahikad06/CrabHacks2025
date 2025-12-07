@@ -27,11 +27,14 @@ font = pygame.font.SysFont(None, 36)
 
 # --- Paths ---
 BASE_PATH = os.path.dirname(__file__)
-CRAB_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/CrabWithBottleCap")
-HAZARD_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Hazards")
-OBJECT_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Plastic")
+IMAGE_DIR = os.path.join(BASE_PATH, "Image")
+# Prefer using the workspace `Image/` folder. Keep old program paths as fallback.
+CRAB_PATH = os.path.join(IMAGE_DIR, "CrabWithBottleCapRight")
+CRAB_PATH_LEFT = os.path.join(IMAGE_DIR, "CrabWithBottleCapLeft")
+HAZARD_CANDIDATES = ["CatFishLeft", "CatFishRight", "Shell", "GreenCrab", "CheeringCrab"]
+OBJECT_PATH = os.path.join(IMAGE_DIR, "Plastic")
 MUSIC_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/background_music.wav")
-START_BG_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Water")
+START_BG_PATH = os.path.join(IMAGE_DIR, "Water")
 
 # --- Load music ---
 if os.path.exists(MUSIC_PATH):
@@ -39,47 +42,99 @@ if os.path.exists(MUSIC_PATH):
     pygame.mixer.music.play(-1)
 
 # --- Load crab frames ---
-crab_frames = []
-for i in range(4):
-    path = os.path.join(CRAB_PATH, f"sprite_{i}.png")
-    frame = pygame.image.load(path).convert_alpha()
-    frame = pygame.transform.scale(frame, (crab_size, crab_size))
-    crab_frames.append(frame)
+def load_frames_from_dir(dir_path, size=None, convert_alpha=True):
+    frames = []
+    if not os.path.isdir(dir_path):
+        return frames
+    files = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+    for fname in files:
+        path = os.path.join(dir_path, fname)
+        try:
+            img = pygame.image.load(path)
+            img = img.convert_alpha() if convert_alpha else img.convert()
+            if size is not None:
+                img = pygame.transform.scale(img, size)
+            frames.append(img)
+        except Exception as e:
+            print("Failed to load image:", path, e)
+    return frames
+
+# Attempt to load crab frames from Image directory first, fallback if empty
+crab_frames = load_frames_from_dir(CRAB_PATH, size=(crab_size, crab_size))
+if not crab_frames:
+    # try left folder and flip as needed
+    left_frames = load_frames_from_dir(CRAB_PATH_LEFT, size=(crab_size, crab_size))
+    if left_frames:
+        crab_frames = [pygame.transform.flip(f, True, False) for f in left_frames]
+    else:
+        # fallback to old location if present (older project layout)
+        old_crab = os.path.join(BASE_PATH, "programs/crabhacks 2025/CrabWithBottleCap")
+        crab_frames = load_frames_from_dir(old_crab, size=(crab_size, crab_size))
+
+if not crab_frames:
+    raise SystemExit("No crab frames found. Make sure your images are in Image/CrabWithBottleCapRight or Image/CrabWithBottleCapLeft")
 
 current_frame = 0
 frame_timer = 0
 animation_speed = 0.15
 
 # --- Load start screen frames ---
-start_frames = []
-for i in range(3):   # 3 frames: start_0.png, start_1.png, start_2.png
-    path = os.path.join(START_BG_PATH, f"sprite_{i}.png")
-    frame = pygame.image.load(path).convert()
-    frame = pygame.transform.scale(frame, (WIDTH, HEIGHT))
-    start_frames.append(frame)
+# --- Load start screen frames ---
+start_frames = load_frames_from_dir(START_BG_PATH, size=(WIDTH, HEIGHT), convert_alpha=False)
+if not start_frames:
+    # fallback: try old path
+    old_start = os.path.join(BASE_PATH, "programs/crabhacks 2025/Water")
+    start_frames = load_frames_from_dir(old_start, size=(WIDTH, HEIGHT), convert_alpha=False)
+if not start_frames:
+    # create a single blank background to avoid crash
+    surf = pygame.Surface((WIDTH, HEIGHT))
+    surf.fill((173, 216, 230))
+    start_frames = [surf]
 
 # --- Hazards with variable frame counts ---
-hazard_frame_counts = [4, 2]  # Example: first hazard 4 frames, second 2 frames, third 3 frames
-num_hazards = len(hazard_frame_counts)
+# --- Hazards: load from subfolders in Image/ when available ---
 hazard_frames = []
 hazard_rects = []
 hazard_current_frames = []
 hazard_timers = []
-hazard_animation_speeds = [0.1, 0.1]  # optional: different speed per hazard
+hazard_animation_speeds = []
 
-for h in range(num_hazards):
-    frames = []
-    for f in range(hazard_frame_counts[h]):
-        path = os.path.join(HAZARD_PATH, f"sprite_{h}_{f}.png")
-        img = pygame.image.load(path).convert_alpha()
-        img = pygame.transform.scale(img, (50, 50))
-        frames.append(img)
-    hazard_frames.append(frames)
-    rect = frames[0].get_rect()
-    rect.topleft = (random.randint(0, WIDTH-50), random.randint(0, HEIGHT-50))
-    hazard_rects.append(rect)
-    hazard_current_frames.append(0)
-    hazard_timers.append(0)
+for candidate in HAZARD_CANDIDATES:
+    folder = os.path.join(IMAGE_DIR, candidate)
+    frames = load_frames_from_dir(folder, size=(50, 50))
+    if frames:
+        hazard_frames.append(frames)
+        rect = frames[0].get_rect()
+        rect.topleft = (random.randint(0, WIDTH-50), random.randint(0, HEIGHT-50))
+        hazard_rects.append(rect)
+        hazard_current_frames.append(0)
+        hazard_timers.append(0)
+        hazard_animation_speeds.append(0.1)
+
+if not hazard_frames:
+    # fallback: try old Hazards folder layout
+    old_hazard = os.path.join(BASE_PATH, "programs/crabhacks 2025/Hazards")
+    if os.path.isdir(old_hazard):
+        files = sorted([f for f in os.listdir(old_hazard) if f.lower().endswith('.png')])
+        if files:
+            # crude single-hazard fallback: load any matching files
+            frames = []
+            for f in files:
+                path = os.path.join(old_hazard, f)
+                try:
+                    img = pygame.image.load(path).convert_alpha()
+                    img = pygame.transform.scale(img, (50, 50))
+                    frames.append(img)
+                except Exception:
+                    pass
+            if frames:
+                hazard_frames.append(frames)
+                rect = frames[0].get_rect()
+                rect.topleft = (random.randint(0, WIDTH-50), random.randint(0, HEIGHT-50))
+                hazard_rects.append(rect)
+                hazard_current_frames.append(0)
+                hazard_timers.append(0)
+                hazard_animation_speeds.append(0.1)
 
 # --- Collectible objects and facts ---
 object_files = ["sprite_0.png","sprite_1.png","sprite_2.png","sprite_3.png"]
@@ -136,6 +191,77 @@ def start_screen():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 return
 
+
+# def win_screen():
+#     # Load win background frames (WinLose folder)
+#     win_bg = load_frames_from_dir(os.path.join(IMAGE_DIR, "WinLose"), size=(WIDTH, HEIGHT), convert_alpha=False)
+#     if not win_bg:
+#         # fallback to a simple filled screen
+#         surf = pygame.Surface((WIDTH, HEIGHT))
+#         surf.fill((255, 223, 186))
+#         win_bg = [surf]
+
+#     # Load cheering crab animation (if present)
+#     cheer_frames = load_frames_from_dir(os.path.join(IMAGE_DIR, "CheeringCrab"), size=(crab_size, crab_size))
+#     # Load a shell image to display on win screen (optional)
+#     shell_frames = load_frames_from_dir(os.path.join(IMAGE_DIR, "Shell"), size=(80, 80))
+
+#     bg_idx = 0
+#     bg_timer = 0
+#     bg_speed = 0.12
+
+#     cheer_idx = 0
+#     cheer_timer = 0
+#     cheer_speed = 0.15
+
+#     shell_y = HEIGHT
+#     shell_target_y = HEIGHT//2 + 60
+
+#     while True:
+#         bg_timer += bg_speed
+#         if bg_timer >= 1:
+#             bg_timer = 0
+#             bg_idx = (bg_idx + 1) % len(win_bg)
+
+#         cheer_timer += cheer_speed
+#         if cheer_timer >= 1 and cheer_frames:
+#             cheer_timer = 0
+#             cheer_idx = (cheer_idx + 1) % len(cheer_frames)
+
+#         # simple shell float-in animation
+#         if shell_frames and shell_y > shell_target_y:
+#             shell_y -= 4
+
+#         screen.blit(win_bg[bg_idx], (0, 0))
+
+#         # draw shell (centered)
+#         if shell_frames:
+#             s_img = shell_frames[0]
+#             s_rect = s_img.get_rect(center=(WIDTH//2 - 80, shell_y))
+#             screen.blit(s_img, s_rect)
+
+#         # draw cheering crab (center)
+#         if cheer_frames:
+#             c_img = cheer_frames[cheer_idx]
+#             c_rect = c_img.get_rect(center=(WIDTH//2 + 80, HEIGHT//2))
+#             screen.blit(c_img, c_rect)
+
+#         # win text
+#         win_font = pygame.font.SysFont(None, 72)
+#         text = win_font.render("You Win!", True, (0, 100, 0))
+#         screen.blit(text, (WIDTH//2 - text.get_width()//2, 50))
+
+#         pygame.display.flip()
+
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 pygame.quit()
+#                 sys.exit()
+#             if event.type == pygame.MOUSEBUTTONDOWN or (event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE)):
+#                 # Exit game after clicking or pressing return/space on win screen
+#                 pygame.quit()
+#                 sys.exit()
+
 start_screen()
 
 # --- Main game loop ---
@@ -181,11 +307,11 @@ while True:
         current_frame = 0
 
     # --- Animate hazards ---
-    for i in range(num_hazards):
+    for i in range(len(hazard_frames)):
         hazard_timers[i] += hazard_animation_speeds[i]
         if hazard_timers[i] >= 1:
             hazard_timers[i] = 0
-            hazard_current_frames[i] = (hazard_current_frames[i] + 1) % hazard_frame_counts[i]
+            hazard_current_frames[i] = (hazard_current_frames[i] + 1) % len(hazard_frames[i])
 
     # --- Check collisions with hazards ---
     for i, rect in enumerate(hazard_rects):
@@ -199,7 +325,13 @@ while True:
         if crab_rect.colliderect(obj["rect"]):
             show_fact = obj["fact"]
             fact_timer = 180  # show for 3 seconds
-            obj["rect"].topleft = (random.randint(50, WIDTH-50), random.randint(50, HEIGHT-150))
+            # remove collected object; when all collected, trigger win
+            try:
+                objects.remove(obj)
+            except ValueError:
+                pass
+            if not objects:
+                win_screen()
 
     if fact_timer > 0:
         fact_timer -= 1
