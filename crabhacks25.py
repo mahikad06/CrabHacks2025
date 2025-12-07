@@ -34,11 +34,11 @@ font = pygame.font.Font(None, 48)
 
 # --- Paths ---
 BASE_PATH = os.path.dirname(__file__)
-CRAB_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/CrabWithBottleCap")
-HAZARD_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Hazards")
-OBJECT_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Plastic")
-MUSIC_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/background_music.wav")
-START_BG_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Water")
+CRAB_PATH = os.path.join(BASE_PATH, "CrabWithBottleCap")
+HAZARD_PATH = os.path.join(BASE_PATH, "Hazards")
+OBJECT_PATH = os.path.join(BASE_PATH, "Plastic")
+MUSIC_PATH = os.path.join(BASE_PATH, "background_music.wav")
+START_BG_PATH = os.path.join(BASE_PATH, "Water")
 
 
 #shell
@@ -50,7 +50,7 @@ shell_active = False  # Only active in level 4
 
 
 # --- Level Backgrounds ---
-LEVEL_BG_PATH = os.path.join(BASE_PATH, "programs/crabhacks 2025/Levels")
+LEVEL_BG_PATH = os.path.join(BASE_PATH, "Levels")
 
 
 level_backgrounds = []
